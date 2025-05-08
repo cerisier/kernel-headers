@@ -23,8 +23,7 @@ The tool supports generating headers for the following architectures:
 
 ### Supported Kernel Versions
 
-Kernel versions 5.x and above are supported.
-Supporting prior versions means tweaking make targets and install older versions of gcc.
+All versions after 3.10.x
 
 ### Distributed Tarballs
 
