@@ -1,6 +1,4 @@
-FROM debian:buster AS builder
-
-ARG KERNEL_VERSION=6.9
+FROM debian:buster AS base
 
 # Install dependencies
 RUN apt-get update && \
@@ -8,15 +6,19 @@ RUN apt-get update && \
         wget xz-utils libssl-dev ca-certificates gcc-7 make libc6-dev rsync && \
     apt-get clean && rm -rf /var/lib/apt/lists/*
 
+RUN update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-7 100 && \
+update-alternatives --set gcc /usr/bin/gcc-7
+
+FROM base as builder
+
+ARG KERNEL_VERSION=6.9
+
 WORKDIR /usr/src
 
 RUN wget https://cdn.kernel.org/pub/linux/kernel/v${KERNEL_VERSION%%.*}.x/linux-${KERNEL_VERSION}.tar.xz && \
     tar -xf linux-${KERNEL_VERSION}.tar.xz && rm linux-${KERNEL_VERSION}.tar.xz
 
 WORKDIR /usr/src/linux-${KERNEL_VERSION}
-
-RUN update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-7 100 && \
-    update-alternatives --set gcc /usr/bin/gcc-7
 
 RUN mkdir -p /build && \
     for arch in \

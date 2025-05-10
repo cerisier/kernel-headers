@@ -1,8 +1,4 @@
-ARG BASE_IMAGE=debian:bookworm
-
-FROM ${BASE_IMAGE} AS builder
-
-ARG KERNEL_VERSION=6.9
+FROM debian:bookworm AS base
 
 # Install dependencies
 RUN apt-get update && \
@@ -10,15 +6,19 @@ RUN apt-get update && \
         wget xz-utils libssl-dev ca-certificates gcc-12 make libc6-dev rsync && \
     apt-get clean && rm -rf /var/lib/apt/lists/*
 
+RUN update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-12 100 && \
+update-alternatives --set gcc /usr/bin/gcc-12
+
+FROM base AS builder
+
+ARG KERNEL_VERSION=6.9
+
 WORKDIR /usr/src
 
 RUN wget https://cdn.kernel.org/pub/linux/kernel/v${KERNEL_VERSION%%.*}.x/linux-${KERNEL_VERSION}.tar.xz && \
     tar -xf linux-${KERNEL_VERSION}.tar.xz && rm linux-${KERNEL_VERSION}.tar.xz
 
 WORKDIR /usr/src/linux-${KERNEL_VERSION}
-
-RUN update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-12 100 && \
-    update-alternatives --set gcc /usr/bin/gcc-12
 
 RUN mkdir -p /build && \
     for arch in \
