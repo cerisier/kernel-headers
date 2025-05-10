@@ -8,7 +8,7 @@ curl -s https://cdn.kernel.org/pub/linux/kernel/ \
     done \
   | grep -oE '\b[0-9]+\.[0-9]+\.[0-9]+\b' \
   | sort -uV \
-> all_versions.txt
+> kernel_versions.txt
 
 awk -F. '
 {
@@ -27,4 +27,4 @@ END {
         print k"."max_patch[k]
     }
 }
-' all_versions.txt | sort -uV > kernel_versions.txt
+' all_versions.txt | sort -uV > kernel_versions_latest_patch.txt
