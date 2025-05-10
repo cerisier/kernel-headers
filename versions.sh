@@ -1,12 +1,25 @@
 #/bin/sh
 
-curl -s https://cdn.kernel.org/pub/linux/kernel/ \
-  | grep -o -E 'v[3-6]\.x' \
-  | sort -u \
-  | while read dir; \
-      do curl -s -L https://cdn.kernel.org/pub/linux/kernel/$dir; \
-    done \
-  | grep -oE '\b[0-9]+\.[0-9]+\.[0-9]+\b' \
+for dir in \
+    v1.0 \
+    v1.1 \
+    v1.2 \
+    v1.3 \
+    v2.0 \
+    v2.1 \
+    v2.2 \
+    v2.3 \
+    v2.4 \
+    v2.5 \
+    v2.6 \
+    v3.x \
+    v4.x \
+    v5.x \
+    v6.x \
+    v7.x; \
+    do curl -s -L https://cdn.kernel.org/pub/linux/kernel/$dir; \
+done \
+  | grep -oE 'linux-(\b[0-9]+\.[0-9]+(\.[0-9]+)?)\b' | sed -E 's/linux-//' \
   | sort -uV \
 > kernel_versions.txt
 
@@ -27,4 +40,4 @@ END {
         print k"."max_patch[k]
     }
 }
-' all_versions.txt | sort -uV > kernel_versions_latest_patch.txt
+' kernel_versions.txt | sort -uV > kernel_versions_latest_patch.txt
