@@ -4,38 +4,16 @@ A tool to generate Linux kernel headers for any architectures and kernel version
 The headers are generated vanilla, and may require further patching for userland usage.
 
 ### Supported Architectures
-The tool supports generating headers for the following architectures:
 
-* alpha
-* arm
-* arm64
-* csky
-* hexagon
-* loongarch
-* m68k
-* mips
-* powerpc
-* riscv
-* s390
-* sh
-* sparc
-* x86
+All architectures available for a given versions are .
 
 ### Supported Kernel Versions
 
-All versions after 3.10.x
+All versions >= 3.0
+
+> Supporting older kernels requires tweaking how we list supported architectures
+> as well as installing a compatible version of gcc.
 
 ### Distributed Tarballs
 
-This project distributes headers for stable and long-term kernel versions as
-defined by https://kernel.org/.
-
-For now:
-* 5.4.293
-* 5.10.237
-* 5.15.181
-* 6.1.137
-* 6.6.89
-* 6.12.27
-* 6.13.12
-* 6.14.5
+This project distributes headers for the latest patch of each minor kernel version. Previously generated headers are retained, so from the date of this project’s release onward, this repository will provide headers for all kernel versions.
