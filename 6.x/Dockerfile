@@ -21,7 +21,21 @@ RUN wget https://cdn.kernel.org/pub/linux/kernel/v${KERNEL_VERSION%%.*}.x/linux-
 WORKDIR /usr/src/linux-${KERNEL_VERSION}
 
 RUN mkdir -p /build && \
-    for arch in $(ls arch | grep -v Kconfig); do \
+    for arch in \
+        alpha \
+        arm \
+        arm64 \
+        csky \
+        hexagon \
+        loongarch \
+        m68k \
+        mips \
+        powerpc \
+        riscv \
+        s390 \
+        sh \
+        sparc \
+        x86; do \
         if [ -d arch/$arch ]; then \
             echo "Building headers for $arch..." && \
             make ARCH=$arch headers_install INSTALL_HDR_PATH=/build/$arch; \
