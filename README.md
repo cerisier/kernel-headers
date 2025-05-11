@@ -1,6 +1,6 @@
-# Linux Headers
+# Kernel Headers
 
-A tool to generate Linux kernel headers for any architectures and kernel versions.
+A tool to generate and distribute Linux kernel headers for any architectures and kernel versions.
 The headers are generated vanilla, and may require further patching for userland usage.
 
 ### Supported Architectures
