@@ -23,13 +23,14 @@ WORKDIR /usr/src/linux-${KERNEL_VERSION}
 RUN mkdir -p /build && \
     for arch in \
         alpha \
+        arc \
         arm \
         arm64 \
         csky \
-        hexagon \
         loongarch \
         m68k \
         mips \
+        openrisc \
         powerpc \
         riscv \
         s390 \

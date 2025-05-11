@@ -14,6 +14,13 @@ KERNEL_VERSIONS=(
 )
 
 for version in "${KERNEL_VERSIONS[@]}"; do
+
+    # skip if already built
+    if [[ -d "build/headers-$version" ]]; then
+        echo "Headers for $version already built, skipping..."
+        continue
+    fi
+
     echo "Building headers for Linux $version..."
 
     if [[ "$version" == 3.* ]]; then
