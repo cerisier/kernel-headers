@@ -12,6 +12,15 @@ for header_dir in build/*; do
 
         assets=()
 
+        tar czf "${tag_name}.tar.gz" -C "build" "$version"
+        tar cf - -C "build" "$version" | zstd -19 -o "${tag_name}.tar.zst"
+
+        sha256sum "${tag_name}.tar.gz" >> sha256sums.txt
+        sha256sum "${tag_name}.tar.zst" >> sha256sums.txt
+
+        assets+=("${tag_name}.tar.gz")
+        assets+=("${tag_name}.tar.zst")
+
         for sub_dir in "$header_dir"/*; do
             if [ -d "$sub_dir" ]; then
                 arch_name=$(basename "$sub_dir")
@@ -35,6 +44,7 @@ for header_dir in build/*; do
 
         release_body="Release for $tag_name"
         gh release create "$tag_name" -t "$tag_name" -n "$release_body" "${assets[@]}"
+        # gh release upload "$tag_name" "${assets[@]}" --clobber
 
         rm "${assets[@]}"
     fi
