@@ -4,7 +4,13 @@ set -eux
 
 DATE=$(date +%Y%m%d)
 
-for header_dir in build/*; do
+if [ -n "$1" ]; then
+    header_dirs=("$1")
+else
+    header_dirs=(build/*)
+fi
+
+for header_dir in "${header_dirs[@]}"; do
     if [ -d "$header_dir" ]; then
         version=$(basename "$header_dir")
         tag_name="${version}-${DATE}"
@@ -40,7 +46,7 @@ for header_dir in build/*; do
         assets+=("sha256sums.txt")
 
         git tag "$tag_name"
-        git push origin "$tag_name"
+        git push origin "$tag_name" --tags
 
         release_body="Release for $tag_name"
         gh release create "$tag_name" -t "$tag_name" -n "$release_body" "${assets[@]}"
