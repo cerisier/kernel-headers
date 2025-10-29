@@ -32,7 +32,7 @@ for release in releases:
             "date": date,
         }
 
-print(latest_by_version)
+# print(latest_by_version)
 
 # Step 3: Build the index
 index = defaultdict(dict)
