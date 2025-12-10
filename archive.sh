@@ -3,11 +3,17 @@
 set -eux
 
 DATE=$(date +%Y%m%d)
+KERNEL_VERSION_FILE="kernel_versions_latest_patch.txt"
 
-if [ -n "$1" ]; then
+if [ -n "${1-}" ]; then
     header_dirs=("$1")
 else
-    header_dirs=(build/*)
+	KERNEL_VERSIONS=(
+        # Skip the 12 first versions (<3.0)
+        # $(tail -n +12 ${KERNEL_VERSION_FILE})
+		$(git diff --unified=0 ${KERNEL_VERSION_FILE} | sed -n 's/^\+\(.*\)/\1/p' | grep -v '+')
+    )
+	header_dirs=("${KERNEL_VERSIONS[@]/#/build/}")
 fi
 
 for header_dir in "${header_dirs[@]}"; do

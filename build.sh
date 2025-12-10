@@ -13,7 +13,8 @@ else
     # Latest patch for all minors
     KERNEL_VERSIONS=(
         # Skip the 12 first versions (<3.0)
-        $(tail -n +12 ${KERNEL_VERSION_FILE})
+        # $(tail -n +12 ${KERNEL_VERSION_FILE})
+		$(git diff --unified=0 ${KERNEL_VERSION_FILE} | sed -n 's/^\+\(.*\)/\1/p' | grep -v '+')
     )
 fi
 
