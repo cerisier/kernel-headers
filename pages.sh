@@ -99,11 +99,11 @@ EOF
 python3 generate_index.py > "$OUTPUT_DIR/index.json"
 
 # 6. publish to gh-pages branch
-# git checkout --orphan gh-pages
-# git rm -rf .
-# cp -R "$OUTPUT_DIR"/* .
-# git add .
-# git commit -m "chore: regenerate gh-pages release index"
-# git push -u origin gh-pages --force
+git checkout gh-pages
+git rm -rf .
+cp -R "$OUTPUT_DIR"/* .
+git add {3,4,5,6}.* index.html index.json
+git commit -m "chore: regenerate gh-pages release index"
+git push -u origin gh-pages --force
 
 echo "✅ gh-pages branch updated!"
