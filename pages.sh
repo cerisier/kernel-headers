@@ -96,7 +96,7 @@ cat >> "$OUTPUT_DIR/index.html" <<EOF
 </html>
 EOF
 
-python generate_index.py > "$OUTPUT_DIR/index.json"
+python3 generate_index.py > "$OUTPUT_DIR/index.json"
 
 # 6. publish to gh-pages branch
 # git checkout --orphan gh-pages
