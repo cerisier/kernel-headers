@@ -1,46 +1,65 @@
 # Kernel Headers
 
-A tool to generate and distribute Linux kernel headers for any architectures and kernel versions.
-The headers are generated vanilla, and may require further patching for userland usage.
+Generate and publish vanilla Linux kernel header tarballs for every supported architecture and kernel version. The toolchain is intentionally minimal: a single `Makefile` orchestrates Docker builds, packaging, release publishing, and catalog generation.
 
-### Supported Architectures
+## Requirements
 
-For now, only the following architectures are generated:
-* alpha
-* arc
-* arm
-* arm64
-* csky
-* loongarch
-* m68k
-* mips
-* openrisc
-* powerpc
-* riscv
-* s390
-* sh
-* sparc
-* x86
+- Docker
+- `zstd` and `tar`
+- `gh` CLI (only for the `release` target)
+- `python3`
 
-Other architectures like hexagon, parisc were producing `gcc: error` because
-`gcc` is invoked using flags that are only available if it was compiled for
-the target architecture.
+## Usage
 
-For now, this project uses a dummy approach of using the host `gcc`, only
-the architectures that did not produce a single `gcc: error` as part of their
-headers generation were kept.
+All steps accept a space-separated list of versions through `VERSIONS="6.9.12 5.15.158"` or as positional arguments. When no versions are provided the scripts operate on everything under `build/` or `dist/`.
 
-TODO(cerisier): Support all architectures the right way, using cross compiler when needed.
+1. **Build headers**  
+   ```sh
+   make build VERSIONS="6.9.12 5.15.158"
+   ```  
+   Builds the requested versions via the unified `Dockerfile` and writes headers to `build/<version>/`.
 
-### Supported Kernel Versions
+2. **Package artifacts**  
+   ```sh
+   make package VERSIONS="6.9.12 5.15.158"
+   ```  
+   Produces per-version archives, `sha256sums.txt`, and `manifest.json` in `dist/<version>/`. Each manifest lists every asset and the deterministic GitHub download URL (`https://github.com/<owner>/<repo>/releases/download/<tag>/<file>`).
 
-All versions >= 3.0
+3. **Create a GitHub release**  
+   ```sh
+   make release VERSIONS="6.9.12 5.15.158"
+   ```  
+   Tags the repository (if needed) and uploads all files from `dist/<version>/` as release assets via `gh release create`.
 
-> Supporting older kernels requires tweaking how we list supported architectures
-> as well as installing a compatible version of gcc.
+4. **Update the catalog**  
+   ```sh
+   make catalog VERSIONS="6.9.12 5.15.158"
+   ```  
+   Merges the new manifest(s) into `catalog/index.json`, providing a single machine-readable index without relying on GitHub Pages.
 
-### Distributed Tarballs
+Run `make help` for a quick summary of the commands.
 
-This project distributes headers for the latest patch of each minor kernel version. Previously generated headers are retained, so from the date of this project’s release onward, this repository will provide headers for all kernel versions.
+## Supported Architectures
 
-Visit https://cerisier.github.io/kernel-headers/
+The default build includes:
+
+```
+alpha arc arm arm64 csky loongarch m68k mips openrisc powerpc riscv s390 sh sparc x86
+```
+
+Architectures such as hexagon or parisc require cross-compilers, so they are currently omitted. Override `ARCH_LIST` when invoking `build.sh` if you need a custom set.
+
+## Supported Kernel Versions
+
+Every kernel version ≥ 3.0 listed in `kernel_versions_latest_patch.txt` is supported. Older releases require different toolchains and are intentionally excluded from the default automation.
+
+## Distribution Artifacts
+
+Each release contains:
+
+- Complete archives for an entire kernel version (`<version>-<date>.tar.{gz,zst}`)
+- Per-architecture archives (`<version>-<arch>.tar.{gz,zst}`)
+- `sha256sums.txt`
+- `manifest.json`
+
+`catalog/index.json` on the `main` branch aggregates every manifest, giving consumers a single JSON document they can periodically fetch instead of scraping GitHub releases or depending on GitHub Pages.

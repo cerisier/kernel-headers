@@ -1,63 +1,107 @@
-#!/bin/bash
+#!/usr/bin/env bash
+set -euo pipefail
 
-set -eux
+RELEASE_DATE=${RELEASE_DATE:-$(date +%Y%m%d)}
+REPOSITORY=${REPOSITORY:-cerisier/kernel-headers}
+BUILD_DIR=${BUILD_DIR:-build}
+DIST_DIR=${DIST_DIR:-dist}
 
-DATE=$(date +%Y%m%d)
-KERNEL_VERSION_FILE="kernel_versions_latest_patch.txt"
-
-if [ -n "${1-}" ]; then
-    header_dirs=("$1")
-else
-	KERNEL_VERSIONS=(
-        # Skip the 12 first versions (<3.0)
-        # $(tail -n +12 ${KERNEL_VERSION_FILE})
-		$(git diff --unified=0 ${KERNEL_VERSION_FILE} | sed -n 's/^\+\(.*\)/\1/p' | grep -v '+')
-    )
-	header_dirs=("${KERNEL_VERSIONS[@]/#/build/}")
+TARGET_VERSIONS=()
+if [[ $# -gt 0 ]]; then
+    TARGET_VERSIONS=("$@")
+elif [[ -n "${VERSIONS-}" ]]; then
+    read -r -a TARGET_VERSIONS <<< "$VERSIONS"
+elif [[ -d "$BUILD_DIR" ]]; then
+    for dir in "$BUILD_DIR"/*; do
+        [[ -d "$dir" ]] || continue
+        TARGET_VERSIONS+=("$(basename "$dir")")
+    done
 fi
 
-for header_dir in "${header_dirs[@]}"; do
-    if [ -d "$header_dir" ]; then
-        version=$(basename "$header_dir")
-        tag_name="${version}-${DATE}"
-        echo "Processing $header_dir, tag $tag_name"
+if [[ ${#TARGET_VERSIONS[@]} -eq 0 ]]; then
+    echo "Nothing to archive" >&2
+    exit 1
+fi
 
-        assets=()
-
-        tar czf "${tag_name}.tar.gz" -C "build" "$version"
-        tar cf - -C "build" "$version" | zstd -19 -o "${tag_name}.tar.zst"
-
-        sha256sum "${tag_name}.tar.gz" >> sha256sums.txt
-        sha256sum "${tag_name}.tar.zst" >> sha256sums.txt
-
-        assets+=("${tag_name}.tar.gz")
-        assets+=("${tag_name}.tar.zst")
-
-        for sub_dir in "$header_dir"/*; do
-            if [ -d "$sub_dir" ]; then
-                arch_name=$(basename "$sub_dir")
-                archive_name="${version}-${arch_name}"
-
-                tar czf "${archive_name}.tar.gz" -C "$(dirname "$sub_dir")" "$arch_name"
-                tar cf - -C "$(dirname "$sub_dir")" "$arch_name" | zstd -19 -o "${archive_name}.tar.zst"
-
-                sha256sum "${archive_name}.tar.gz" >> sha256sums.txt
-                sha256sum "${archive_name}.tar.zst" >> sha256sums.txt
-
-                assets+=("${archive_name}.tar.gz")
-                assets+=("${archive_name}.tar.zst")
-            fi
-        done
-
-        assets+=("sha256sums.txt")
-
-        git tag "$tag_name"
-        git push origin "$tag_name" --tags
-
-        release_body="Release for $tag_name"
-        gh release create "$tag_name" -t "$tag_name" -n "$release_body" "${assets[@]}"
-        # gh release upload "$tag_name" "${assets[@]}" --clobber
-
-        rm "${assets[@]}"
+sha256_for_file() {
+    local path=$1
+    if command -v sha256sum >/dev/null 2>&1; then
+        sha256sum "$path" | awk '{print $1}'
+    elif command -v shasum >/dev/null 2>&1; then
+        shasum -a 256 "$path" | awk '{print $1}'
+    else
+        python3 - "$path" <<'PY'
+import hashlib, sys
+hasher = hashlib.sha256()
+with open(sys.argv[1], "rb") as fh:
+    for chunk in iter(lambda: fh.read(1024 * 1024), b""):
+        hasher.update(chunk)
+print(hasher.hexdigest())
+PY
     fi
+}
+
+for version in "${TARGET_VERSIONS[@]}"; do
+    version_dir="$BUILD_DIR/$version"
+    if [[ ! -d "$version_dir" ]]; then
+        echo "Missing build artifacts for $version" >&2
+        continue
+    fi
+
+    tag_name="${version}-${RELEASE_DATE}"
+    output_dir="$DIST_DIR/$version"
+    rm -rf "$output_dir"
+    mkdir -p "$output_dir"
+
+    sha_file="$output_dir/sha256sums.txt"
+    : > "$sha_file"
+    manifest_rows=$(mktemp)
+
+    record_asset() {
+        local path=$1
+        local kind=$2
+        local arch=${3:--}
+        local compression=${4:--}
+        local add_to_checksums=${5:-true}
+        local name
+        name=$(basename "$path")
+        local sha
+        sha=$(sha256_for_file "$path")
+        if [[ "$add_to_checksums" == "true" ]]; then
+            printf "%s  %s\n" "$sha" "$name" >> "$sha_file"
+        fi
+        printf "%s\t%s\t%s\t%s\t%s\t%s\n" "$name" "$kind" "$arch" "$compression" "$path" "$sha" >> "$manifest_rows"
+    }
+
+    echo "Packaging $version as $tag_name"
+
+    tar czf "$output_dir/${tag_name}.tar.gz" -C "$BUILD_DIR" "$version"
+    record_asset "$output_dir/${tag_name}.tar.gz" "bundle" "-" "tar.gz"
+
+    tar cf - -C "$BUILD_DIR" "$version" | zstd -19 -o "$output_dir/${tag_name}.tar.zst"
+    record_asset "$output_dir/${tag_name}.tar.zst" "bundle" "-" "tar.zst"
+
+    for arch_dir in "$version_dir"/*; do
+        if [[ -d "$arch_dir" ]]; then
+            arch_name=$(basename "$arch_dir")
+            tar czf "$output_dir/${version}-${arch_name}.tar.gz" -C "$version_dir" "$arch_name"
+            record_asset "$output_dir/${version}-${arch_name}.tar.gz" "arch" "$arch_name" "tar.gz"
+
+            tar cf - -C "$version_dir" "$arch_name" | zstd -19 -o "$output_dir/${version}-${arch_name}.tar.zst"
+            record_asset "$output_dir/${version}-${arch_name}.tar.zst" "arch" "$arch_name" "tar.zst"
+        fi
+    done
+
+    record_asset "$sha_file" "checksum" "-" "txt" false
+
+    ./scripts/render_manifest.py \
+        --repo "$REPOSITORY" \
+        --version "$version" \
+        --tag "$tag_name" \
+        --release-date "$RELEASE_DATE" \
+        --artifact-file "$manifest_rows" \
+        --output "$output_dir/manifest.json"
+
+    rm -f "$manifest_rows"
+
 done

@@ -1,55 +1,79 @@
-#!/bin/bash
-
-set -x
+#!/usr/bin/env bash
+set -euo pipefail
 
 trap 'echo "Interrupted!"; exit 1' SIGINT
 
-# versions.sh
-KERNEL_VERSION_FILE="kernel_versions_latest_patch.txt"
+KERNEL_VERSION_FILE=${KERNEL_VERSION_FILE:-kernel_versions_latest_patch.txt}
+BUILD_DIR=${BUILD_DIR:-build}
+DOCKERFILE=${DOCKERFILE:-Dockerfile}
+ARCH_LIST=${ARCH_LIST:-"alpha arc arm arm64 csky loongarch m68k mips openrisc powerpc riscv s390 sh sparc x86"}
 
-if [[ -n "$1" ]]; then
-    KERNEL_VERSIONS=("$1")
+KERNEL_VERSIONS=()
+if [[ $# -gt 0 ]]; then
+    KERNEL_VERSIONS=("$@")
+elif [[ -n "${VERSIONS-}" ]]; then
+    read -r -a KERNEL_VERSIONS <<< "$VERSIONS"
 else
-    # Latest patch for all minors
-    KERNEL_VERSIONS=(
-        # Skip the 12 first versions (<3.0)
-        # $(tail -n +12 ${KERNEL_VERSION_FILE})
-		$(git diff --unified=0 ${KERNEL_VERSION_FILE} | sed -n 's/^\+\(.*\)/\1/p' | grep -v '+')
-    )
+    if [[ ! -f "$KERNEL_VERSION_FILE" ]]; then
+        echo "Missing $KERNEL_VERSION_FILE" >&2
+        exit 1
+    fi
+    while IFS= read -r line; do
+        [[ -n "$line" ]] && KERNEL_VERSIONS+=("$line")
+    done < <(awk -F. '$1 + 0 >= 3 {print}' "$KERNEL_VERSION_FILE")
 fi
 
-for version in "${KERNEL_VERSIONS[@]}"; do
+if [[ ${#KERNEL_VERSIONS[@]} -eq 0 ]]; then
+    echo "No kernel versions provided" >&2
+    exit 1
+fi
 
-    # skip if already built
-    if [[ -d "build/$version" ]]; then
-        echo "Headers for $version already built, skipping..."
+compute_build_args() {
+    local version=$1
+    local major=${version%%.*}
+    case "$major" in
+        3)
+            echo "--build-arg BASE_IMAGE=debian:buster --build-arg GCC_PACKAGE=gcc-7 --build-arg GCC_BIN=gcc-7"
+            ;;
+        4|5|6|7|8|9)
+            echo "--build-arg BASE_IMAGE=debian:bookworm --build-arg GCC_PACKAGE=gcc-12 --build-arg GCC_BIN=gcc-12"
+            ;;
+        *)
+            echo ""
+            ;;
+    esac
+}
+
+for version in "${KERNEL_VERSIONS[@]}"; do
+    if [[ -z "$version" ]]; then
+        continue
+    fi
+
+    if [[ -d "${BUILD_DIR}/${version}" ]]; then
+        echo "Headers for $version already built, skipping."
+        continue
+    fi
+
+    build_args=$(compute_build_args "$version")
+    if [[ -z "$build_args" ]]; then
+        echo "Unsupported version: $version" >&2
         continue
     fi
 
     echo "Building headers for Linux $version..."
 
-    if [[ "$version" == 3.* ]]; then
-        DOCKERFILE="3.x/Dockerfile"
-    elif [[ "$version" == 4.* ]]; then
-        DOCKERFILE="4.x/Dockerfile"
-    elif [[ "$version" == 5.* ]]; then
-        DOCKERFILE="5.x/Dockerfile"
-    elif [[ "$version" == 6.* ]]; then
-        DOCKERFILE="6.x/Dockerfile"
-    else
-        echo "Unsupported version: $version"
-        continue
-    fi
-
     docker build \
         --progress=plain \
-        --build-arg KERNEL_VERSION=$version \
-        -f $DOCKERFILE \
-        -t kernel-headers:$version .;
+        --build-arg KERNEL_VERSION="$version" \
+        --build-arg ARCH_LIST="$ARCH_LIST" \
+        $build_args \
+        -f "$DOCKERFILE" \
+        -t "kernel-headers:${version}" .
 
-    mkdir -p build
-    docker create --name extract-headers-$version kernel-headers:$version /bin/true
-    docker cp extract-headers-$version:/build ./build/$version
-    docker rm extract-headers-$version
+    mkdir -p "$BUILD_DIR"
+    container_name="extract-headers-${version}"
+    docker create --name "$container_name" "kernel-headers:${version}" /bin/true >/dev/null
+    docker cp "$container_name":/build "${BUILD_DIR}/${version}"
+    docker rm "$container_name" >/dev/null
 
 done
