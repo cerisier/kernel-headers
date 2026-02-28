@@ -1,4 +1,4 @@
-#/bin/sh
+#!/bin/sh
 
 for dir in \
     v1.0 \
@@ -17,11 +17,11 @@ for dir in \
     v5.x \
     v6.x \
     v7.x; \
-    do curl -s -L https://cdn.kernel.org/pub/linux/kernel/$dir; \
+    do curl -s -L https://mirrors.edge.kernel.org/pub/linux/kernel/$dir; \
 done \
-  | grep -oE 'linux-(\b[0-9]+\.[0-9]+(\.[0-9]+)?)\b' | sed -E 's/linux-//' \
-  | sort -uV \
-> kernel_versions.txt
+  | grep -oE '(linux|patch|ChangeLog)-[0-9]+\.[0-9]+(\.[0-9]+)?' \
+  | sed -E 's/^(linux|patch|ChangeLog)-//' \
+  | sort -uV > kernel_versions.txt
 
 awk -F. '
 {
